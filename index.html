@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Merry Go Round - Blueprint Final</title>
+<style>
+body{font-family:Arial;padding:10px;background:#f4f6f8}
+h2{color:#0f172a}
+button{padding:16px;width:100%;border:none;border-radius:10px;font-weight:bold;cursor:pointer;margin:6px 0}
+.card{background:white;border-radius:10px;padding:12px;margin:10px 0;border:1px solid #ddd}
+.b1{background:#16a34a;color:white}
+.b2{background:#2563eb;color:white}
+.orange{background:#f59e0b}
+.gray{background:#e2e8f0}
+.greenTxt{color:green;font-weight:bold}
+table{width:100%;border-collapse:collapse}
+td,th{border:1px solid #ccc;padding:6px;text-align:center}
+input{padding:10px;width:96%;margin:6px 0;border:1px solid #ccc;border-radius:6px}
+.payBox{border:2px solid red;background:#fff7f7;border-radius:10px;padding:15px;margin-top:15px}
+</style>
+</head>
+<body>
+<h2>MERRY GO ROUND APP — COMPLETE BLUEPRINT</h2>
+
+<div class="card">
+<h3>1. Two Range Buttons (Separate)</h3>
+<button class="b1" onclick="loadRanges('participating')">
+BUTTON 1: Participating Members' Ranges - 5 per press
+</button>
+<button class="b2" onclick="loadRanges('ordinary')">
+BUTTON 2: Generate Ordinary Ranges - 5 per press (e.g KSh 10-20...) independent
+</button>
+<div id="rangesArea"></div>
+</div>
+
+<div id="selectBox" class="payBox" style="display:none">
+<h3 id="selTitle"></h3>
+<table>
+<tr><th>Range No</th><th>Range</th><th>Range Charge (8×n)</th><th>Max Contribution (High×10)</th></tr>
+<tr><td id="rn"></td><td id="rl"></td><td id="rc"></td><td id="mc"></td></tr>
+</table>
+<p id="chargeStatus"></p>
+Phone: <input id="phone" placeholder="07...">
+Actual contribution within range: <input id="actual" type="number" placeholder="e.g 15">
+<p style="font-size:12px">App must reject if below min or above max. Stored separately from max contribution.</p>
+<button class="b2" onclick="doJoin()">Complete Join - Save to DB + Check Group 10</button>
+<pre id="result" style="background:#f1f5f9;padding:10px;white-space:pre-wrap"></pre>
+</div>
+
+<div class="card">
+<h3>8. Group Membership (10 members)</h3>
+<div id="groupInfo">No group yet</div>
+</div>
+
+<script>
+let current=null;
+async function loadRanges(source){
+  let data=await fetch('/ranges?source='+source).then(r=>r.json());
+  let title = source=='participating'? 'Participating Members Ranges (5 at a time, press again if not satisfied)' : 'Ordinary Ranges (independent, 5 per press)';
+  let html=`<h4>${title}</h4>`;
+  data.forEach(x=>{
+    html+=`<div class="card">
+      <b>${x.label}</b> - Range No: ${x.range_number}<br>
+      Min: ${x.min} Max: ${x.max}<br>
+      People already in this range: ${x.people_already}<br>
+      Range charge = 8×${x.range_number} = <b>KSh ${x.range_charge}</b><br>
+      Max contribution = ${x.max}×10 = <b>KSh ${x.max_contribution}</b><br>
+      Source: ${x.source}<br>
+      <button class="b1" onclick='selectR(${x.range_number},${x.min},${x.max},${x.range_charge},${x.max_contribution},"${x.label}","${x.source}")'>Select this range</button>
+    </div>`;
+  });
+  html+=`<button class="orange" onclick="loadRanges('${source}')">Not satisfied? Press again - 5 new ranges appear</button>`;
+  document.getElementById('rangesArea').innerHTML=html;
+}
+
+function selectR(rn,mn,mx,charge,maxC,label,source){
+  current={range_number:rn,min:mn,max:mx,charge,maxC,label,source};
+  document.getElementById('selectBox').style.display='block';
+  document.getElementById('selTitle').innerText='Selected: '+label+' ('+source+')';
+  document.getElementById('rn').innerText=rn;
+  document.getElementById('rl').innerText=label;
+  document.getElementById('rc').innerText='KSh '+charge+' (8×'+rn+')';
+  document.getElementById('mc').innerText='KSh '+maxC+' ('+mx+'×10)';
+  document.getElementById('chargeStatus').innerHTML=`
+    Range charge KSh 8×${rn}=${charge} | Max KSh ${maxC} is ONE-TIME per membership+range. App will check DB for duplicate.<br>
+    Now select actual contribution amount within ${mn}-${mx}
+  `;
+  window.scrollTo(0,document.body.scrollHeight);
+}
+
+async function doJoin(){
+  let phone=document.getElementById('phone').value;
+  let actual=parseInt(document.getElementById('actual').value);
+  if(!phone ||!actual){ alert('Enter phone and amount'); return; }
+  if(!current){ alert('Select range first'); return; }
+
+  // Check max payment already done
+  let check=await fetch(`/check_max_payment?phone=${phone}&range_number=${current.range_number}`).then(r=>r.json());
+
+  let body={
+    phone,
+    range_number:current.range_number,
+    range_source:current.source,
+    actual_amount:actual
+  };
+  let res=await fetch('/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+  document.getElementById('result').textContent=JSON.stringify({max_payment_check:check,join_result:res},null,2);
+  document.getElementById('groupInfo').innerHTML=`
+    Group: ${res.group_id}<br>
+    Members: ${res.group_members}/10<br>
+    Status: ${res.group_status}<br>
+    Total for beneficiary: ${res.total_for_beneficiary}<br>
+    ${res.beneficiary_paid? '<b class=greenTxt>BENEFICIARY PAID: KSh '+res.beneficiary_paid+'</b>' : 'Waiting for 10 eligible members'}
+  `;
+}
+</script>
+</body>
+</html>
