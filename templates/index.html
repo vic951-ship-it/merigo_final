@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merigo Final</title>
+<style>
+body{font-family:Arial;text-align:center;padding:20px;background:#f5f5f5}
+.card{background:white;padding:20px;border-radius:15px;max-width:400px;margin:auto;box-shadow:0 4px 10px rgba(0,0,0,0.1)}
+button{padding:15px 30px;font-size:18px;background:#25D366;color:white;border:none;border-radius:10px;width:100%;margin-top:15px}
+input{padding:12px;width:90%;margin:5px;border-radius:8px;border:1px solid #ccc}
+#status{margin-top:15px;font-weight:bold}
+</style>
+</head>
+<body>
+<div class="card">
+<h2>Merigo Group</h2>
+<input id="phone" placeholder="Phone 07...">
+<input id="gid" value="merigo-1" placeholder="Group ID">
+<button id="btn" onclick="join()">JOIN NOW - Button1</button>
+<div id="status">Ready</div>
+<div id="info"></div>
+</div>
+<script>
+async function join(){
+ let p=document.getElementById('phone').value||'0700000000';
+ let gid=document.getElementById('gid').value||'merigo-1';
+ document.getElementById('status').innerText='Joining...';
+ let res=await fetch('/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({group_id:gid,phone:p,amount:100})});
+ let data=await res.json();
+ document.getElementById('status').innerText=data.group_status;
+ document.getElementById('info').innerText='Members: '+data.group_members+' | Total: '+data.total_for_beneficiary;
+}
+</script>
+</body>
+</html>
